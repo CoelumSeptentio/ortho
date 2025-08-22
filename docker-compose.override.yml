@@ -1,0 +1,26 @@
+# docker-compose.override.yml
+services:
+  meili:
+    env_file:
+      - ./meili/.env
+    restart: unless-stopped
+
+  cms:
+    restart: unless-stopped
+
+  frontend:
+    environment:
+      CHOKIDAR_USEPOLLING: "1"
+      VITE_FS_EVENTS_POLLING: "1"
+#    command: sh -lc "npx --yes nuxi dev --host 0.0.0.0 --port 3000"
+    command: >
+      sh -lc "
+        npx --yes pnpm@9 install --no-frozen-lockfile --ignore-scripts &&
+        npx --yes pnpm@9 dev --host 0.0.0.0 --port 3000
+      "
+    volumes:
+      - ./frontend:/app
+    restart: unless-stopped
+
+  proxy:
+    restart: unless-stopped
