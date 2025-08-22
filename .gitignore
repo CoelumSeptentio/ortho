@@ -31,3 +31,9 @@ yarn-debug.log*
 
 # Meili / CMS runtime (jei generuojama vietoje)
 meili/data/
+
+# Editor/OS local configs
+.config/
+
+# MeiliSearch runtime
+meili/
