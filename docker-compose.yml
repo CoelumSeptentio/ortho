@@ -1,67 +1,143 @@
 version: "3.9"
 
 services:
+  
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ortho
+      POSTGRES_USER: ortho
+      POSTGRES_PASSWORD: ortho
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
   cms:
-    image: node:18
+    image: node:20
     working_dir: /app
-    volumes: [ "./cms:/app" ]
-    env_file: [ ".env", "./cms/.env" ]
-    extra_hosts: [ "host.docker.internal:host-gateway" ]
-    command: sh -c "npm ci || npm install; npm run develop"
+    user: "${UID}:${GID}"             # ← labai svarbu
+    environment:
+      NODE_ENV: development
+      HOST: "0.0.0.0"
+      PORT: "1337"
+      # DB – kaip turi būti tavo `db` servise
+      DATABASE_CLIENT: postgres
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+      DATABASE_NAME: ortho
+      DATABASE_USERNAME: ortho
+      DATABASE_PASSWORD: ortho
+      DATABASE_SSL: "false"
+      # Vieši URL
+      ADMIN_PATH: /admin
+      ADMIN_URL: "http://195.181.245.93:8080/cms/admin"
+      PUBLIC_URL: "http://195.181.245.93:8080/cms"
+      STRAPI_ADMIN_BACKEND_URL: /cms
+      NODE_OPTIONS: "--max-old-space-size=3072"
+      npm_config_optional: "false"
+      # ↓↓↓ fixes dėl EACCES į /.npm/_logs
+      HOME: "/tmp"
+      NPM_CONFIG_CACHE: "/tmp/.npm"
+      npm_config_cache: "/tmp/.npm"
+    env_file:
+      - ./cms/.env
+    command: >
+      sh -lc '
+        if [ ! -d node_modules ]; then
+          mkdir -p /tmp/.npm &&
+          npm install --include=optional --no-audit --fund=false
+        fi;
+        npm run develop
+      '
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:1337/admin || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 50
+      start_period: 300s
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./cms:/app
+    mem_limit: 3g
+    cpus: "1.0"
+    restart: unless-stopped
+
+
 
   meili:
     image: getmeili/meilisearch:v1.10
     env_file: [ "./meili/.env" ]
-    volumes: [ "meili:/meili_data" ]
-
+    volumes:
+      - meili:/meili_data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:7700/health | grep -q 'available' || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
   frontend:
-    image: node:20
-    working_dir: /app
-    volumes: [ "./frontend:/app" ]
-    env_file: [ ".env", "./frontend/.env" ]
+    # Vietoje image: node:20 + volumes → naudok Dockerfile build
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     environment:
-      HOST: "0.0.0.0"
-      PORT: "3000"
+      NODE_ENV: "production"
       NITRO_HOST: "0.0.0.0"
       NITRO_PORT: "3000"
-      NODE_OPTIONS: "--max-old-space-size=1024"
-      CHOKIDAR_USEPOLLING: "1"         # <-- dev režimui
-      VITE_FS_EVENTS_POLLING: "1"      # <-- dev režimui
-    # (nebūtina) – papildomi limitai konteineryje
-#    sysctls:
-#      - fs.inotify.max_user_watches=1048576
-#      - fs.inotify.max_user_instances=2048
-#    command: sh -lc "npx --yes pnpm@9 dev --host 0.0.0.0 --port 3000"
-    command: >
-          sh -lc '
-            node -e "p=require(\"./package.json\"); process.exit(p.scripts&&p.scripts.dev?0:1)" \
-              && exec npx --yes pnpm@9 dev --host 0.0.0.0 --port 3000 \
-              || exec npx --yes nuxi dev --host 0.0.0.0 --port 3000
-          '
-    depends_on: [ cms, meili ]
+      NUXT_TELEMETRY_DISABLED: "1"
+      # nuxt.runtimeConfig
+      CMS_INTERNAL_URL: "http://cms:1337"
+      CMS_PUBLIC_URL: "/cms"
+      NUXT_PUBLIC_API_BASE: "/cms"
+      NUXT_PUBLIC_MEILI_HOST: "/meili"
+      NODE_OPTIONS: "--max-old-space-size=512"
+    # ⚠️ NEVOLYMUOK šaltinio kodo!
+    expose:
+      - "3000"
     healthcheck:
-#      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
-#      test:  ["CMD-SHELL", "curl -fsS http://localhost:3000/ >/dev/null || exit 1"]
-      test:  ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000/', r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))"]
-      interval: 2s
-      timeout: 2s
-      retries: 120
-      start_period: 90s
 
+      test:
+      - CMD-SHELL
+      - node -e "fetch('http://localhost:3000/api/ping').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+     # test: ["CMD-SHELL", "curl -fsS http://localhost:3000/api/ping || exit 1"]
+      interval: 20s
+      timeout: 3s
+      retries: 10
+      start_period: 25s
+    depends_on:
+      cms:
+        condition: service_healthy
+      meili:
+        condition: service_healthy
+    restart: unless-stopped
+   
   proxy:
     image: nginx:1.27
-    # proxy startuos tik kai frontend bus healthy
     depends_on:
+      cms:
+        condition: service_started
       frontend:
         condition: service_healthy
     volumes:
       - ./reverse-proxy/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./reverse-proxy/10-wait-for-frontend.sh:/docker-entrypoint.d/10-wait-for-frontend.sh:ro
     environment:
-      WAIT_URL: http://frontend:3000/
-      WAIT_RETRIES: "300"     # (nebūtina) kiek kartų bandyti
-      WAIT_INTERVAL: "2"      # (nebūtina) sekundės tarp bandymų
-    ports: [ "8080:80" ]
+      # laukiame frontend'o /api/ping (vietoj /api/health)
+      WAIT_URL: http://frontend:3000/api/ping
+      WAIT_RETRIES: "300"
+      WAIT_INTERVAL: "2"
+    ports:
+      - "8080:80"
+    restart: unless-stopped
 
 volumes:
+  dbdata:
   meili:

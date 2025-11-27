@@ -1,0 +1,20 @@
+{
+  "header": {
+    "brand": "ORTOMEDICA",
+    "phone": "+370 69941969",
+    "login": "Login",
+    "account": "Kabinetas"
+  },
+  "nav": {
+    "catalog": "Katalogas",
+    "about": "Kompanija",
+    "certificates": "Sertifikatai",
+    "articles": "Straipsniai",
+    "contacts": "Kontaktai"
+  },
+  "hero": {
+    "title": "Ortopedinė produkcija visai šeimai",
+    "cta": "Pereiti į katalogą"
+  },
+  "footer": "© 2025 ORTOMEDICA"
+}

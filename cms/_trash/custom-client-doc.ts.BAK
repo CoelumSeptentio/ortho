@@ -1,0 +1,6 @@
+export default {
+  routes: [
+    { method: "GET", path: "/client-docs/me",      handler: "client-doc.me" },
+    { method: "GET", path: "/client-documents/me", handler: "client-doc.me" }
+  ]
+}

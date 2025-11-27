@@ -1,15 +1,16 @@
 // frontend/tailwind.config.js
 module.exports = {
   content: [
-    './app.vue',
-    './error.vue',
-    './components/**/*.{vue,js,ts}',
-    './pages/**/*.vue',
-    './layouts/**/*.vue',
-    './plugins/**/*.{js,ts}',
-    // jei naudosite Content modulį ar Markdown:
-    './content/**/*.{md,yml,json}'
+    './app/app.vue',
+    './app/error.vue',
+    './app/components/**/*.{vue,js,ts}',
+    './app/pages/**/*.vue',
+    './app/layouts/**/*.vue',
+    './app/plugins/**/*.{js,ts}',
+    // jei naudoji @nuxt/content ir md/yml/json – atkomentuok šitą:
+    // './app/content/**/*.{md,yml,json}'
   ],
   theme: { extend: {} },
   plugins: []
 }
+

@@ -1,5 +1,7 @@
 {
   // https://nuxt.com/docs/guide/concepts/typescript
+
+  "compilerOptions": {     "types": ["@nuxtjs/i18n"]  },
   "files": [],
   "references": [
     {

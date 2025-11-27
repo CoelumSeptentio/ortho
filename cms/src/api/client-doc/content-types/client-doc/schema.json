@@ -1,0 +1,39 @@
+{
+  "kind": "collectionType",
+  "collectionName": "client_docs",
+  "info": {
+    "singularName": "client-doc",
+    "pluralName": "client-docs",
+    "displayName": "Client Doc",
+    "description": "B2B kliento dokumentai"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "file": {
+      "type": "media",
+      "multiple": false,
+      "required": true
+    },
+    "notes": {
+      "type": "text"
+    },
+    "owner": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "private": false,
+      "inversedBy": "clientDocs"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "title"
+    }
+  }
+}
